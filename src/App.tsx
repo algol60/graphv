@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+import { F32Array, NodeIndex, EdgeIndex } from './util';
+
 const FIELD_OF_VIEW = 45.0;
 
 const initialiseScene = (node: HTMLDivElement) => {
@@ -23,7 +25,7 @@ const initialiseScene = (node: HTMLDivElement) => {
 
   const setup = (node: HTMLDivElement, json: any) => {
 
-    const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, window.innerWidth/window.innerHeight, 0.1, 2000);
+    const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, window.innerWidth/window.innerHeight, 0.1, 4000);
 
     const onWindowResize = () => {
       const newAspect = window.innerWidth / window.innerHeight;
@@ -36,10 +38,20 @@ const initialiseScene = (node: HTMLDivElement) => {
     // scene.add( new THREE.AmbientLight(0xffffff));
 
     const nodeGeometry = new THREE.BufferGeometry()
-    const nodePositions = [];
-    const nodeColors = [];
+    const nodePositions = new F32Array(json.nodes.length*3);
+    const nodeColors = new F32Array(json.nodes.length*3);
+
+    // Map the node ids to a position and a buffer index.
+    //
+    const nodeIndexes = new Map<string, NodeIndex>();
+
     for (let i=0; i<json.nodes.length; i++) {
-      nodePositions.push(json.nodes[i].x*2, json.nodes[i].y*2, 0);
+      const x = json.nodes[i].x;
+      const y = json.nodes[i].y;
+      const z = 0;//Math.random()*10;
+      nodePositions.push(x, y, z);
+
+      nodeIndexes.set(json.nodes[i].id, new NodeIndex(x, y, z))
 
       // Assign a color depending on the entity class.
       // If the entity class is not recognides, assign white.
@@ -49,8 +61,27 @@ const initialiseScene = (node: HTMLDivElement) => {
       nodeColors.push(...color);
     }
 
-    nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
-    nodeGeometry.setAttribute('color', new THREE.Float32BufferAttribute(nodeColors, 3));
+    nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions.array, 3));
+    nodeGeometry.setAttribute('color', new THREE.Float32BufferAttribute(nodeColors.array, 3));
+
+    const edgeIndexes = new EdgeIndex(nodeIndexes);
+    for (let i=0; i<json.edges.length; i++) {
+      const src = json.edges[i].source;
+      const tgt = json.edges[i].target;
+      edgeIndexes.add(src, tgt);
+    }
+
+    const lineGeometry = new THREE.BufferGeometry();
+    lineGeometry.setIndex(edgeIndexes.edgeIndexes);
+    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgeIndexes.edgePositions, 3));
+    lineGeometry.computeBoundingSphere();
+    const lineMaterial = new THREE.LineBasicMaterial({color:0x7f7f7f});
+    const lineSegments = new THREE.LineSegments(lineGeometry, lineMaterial);
+
+    const pn = new THREE.Object3D();
+    pn.add(lineSegments);
+    // scene.add(lineSegments);
+    scene.add(pn);
 
     const sprite = new THREE.TextureLoader().load('circle.png');
     sprite.colorSpace = THREE.SRGBColorSpace;
@@ -92,6 +123,7 @@ const initialiseScene = (node: HTMLDivElement) => {
 
   (async function(url: string) {
     const json = await loadGraph(url);
+    console.log(`GRAPH: nnodes=${json.nodes.length} nedges=${json.edges.length}`);
     setup(node, json);
   })('graph.json');
 }
