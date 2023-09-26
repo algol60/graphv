@@ -81,3 +81,25 @@ export class EdgeIndex {
         this.edgeIndexes.push(ti.index);
     }
 }
+
+// export function makeLabels(graph: any, document: Document, scene: THREE.Scene) {
+//     for (let i=0; i<graph.nodes.length; i++) {
+//         const node = graph.nodes[i];
+//         const x = node.x;
+//         const y = node.y;
+//         const z = 0;//Math.random()*10;
+
+//         // console.log(node.label, x, y, z);
+//         const label = document.createElement('div');
+//         label.className = 'label';
+//         label.style.backgroundColor = 'rgb(0, 255, 0)';
+//         label.textContent = node.label;
+
+//         const cssObject = new CSS3DObject(label);
+//         cssObject.position.x = x+20;
+//         cssObject.position.y = y+20;
+//         cssObject.position.z = z+2;
+
+//         scene.add(cssObject);
+//     }
+// }

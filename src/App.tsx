@@ -6,7 +6,7 @@ import { F32Array, NodeIndex, EdgeIndex } from './util';
 
 const FIELD_OF_VIEW = 45.0;
 
-const initialiseScene = (node: HTMLDivElement) => {
+const initialiseScene = (htmlElem: HTMLDivElement) => {
 
   const COLOR_MAP = new Map<string, number[]>([
     ['A', [1,0.25,0.25]],
@@ -23,7 +23,7 @@ const initialiseScene = (node: HTMLDivElement) => {
     return json;
   };
 
-  const setup = (node: HTMLDivElement, json: any) => {
+  const setup = (htmlElem: HTMLDivElement, json: any) => {
 
     const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, window.innerWidth/window.innerHeight, 0.1, 4000);
 
@@ -32,6 +32,21 @@ const initialiseScene = (node: HTMLDivElement) => {
       camera.aspect = newAspect;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+
+    const pointer = new THREE.Vector2();
+    const onPointerMove = (event: PointerEvent) => {
+      pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    }
+
+    const onClick = (_event: MouseEvent) => {
+      if (intersected!==undefined) {
+        const ix = intersected.index!;// * 3;
+        const colorAttr = nodeGeometry.getAttribute('color');
+        colorAttr.setXYZ(ix, 0, 0, 0);
+        colorAttr.needsUpdate = true;
+      }
     };
 
     const scene = new THREE.Scene();
@@ -87,16 +102,23 @@ const initialiseScene = (node: HTMLDivElement) => {
     sprite.colorSpace = THREE.SRGBColorSpace;
 
     const material = new THREE.PointsMaterial( { size: 8, sizeAttenuation: true, map: sprite, alphaTest: 0.5, transparent: true, vertexColors: true } );
-    // material.color.setHSL( 1.0, 0.3, 0.7, THREE.SRGBColorSpace );
+    // material.onBeforeCompile = (shader) => {
+    //   console.log(`${shader.vertexShader}`);
+    //   console.log(`${shader.fragmentShader}`);
+    // }
 
     const nodes = new THREE.Points(nodeGeometry, material);
     scene.add(nodes);
 
+    // const labels = makeLabels(json, document, scene);
+
+    const raycaster = new THREE.Raycaster();
+
     const renderer = new THREE.WebGLRenderer();
-    renderer.setClearColor(0);//(0xffffff);
+    renderer.setClearColor(0x2b2b2b);//(0xffffff);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    node.appendChild(renderer.domElement);
+    htmlElem.appendChild(renderer.domElement);
 
     // Zoom the camera to fit the scene.
     // Move the orbital control to match.
@@ -108,8 +130,14 @@ const initialiseScene = (node: HTMLDivElement) => {
     controls.target = new THREE.Vector3(c.center.x, c.center.y, c.center.z);
     controls.update();
 
+    let intersected: THREE.Intersection<THREE.Object3D<THREE.Object3DEventMap>> | undefined = undefined;
     const animate = () => {
       requestAnimationFrame(animate)
+
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObject(nodes);
+
+      intersected = intersects.length>0 ? intersects[0] : undefined;
 
       // required if controls.enableDamping or controls.autoRotate are set to true
       // controls.update();
@@ -119,21 +147,23 @@ const initialiseScene = (node: HTMLDivElement) => {
     animate();
 
     window.addEventListener('resize', onWindowResize);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('click', onClick);
   };
 
   (async function(url: string) {
     const json = await loadGraph(url);
     console.log(`GRAPH: nnodes=${json.nodes.length} nedges=${json.edges.length}`);
-    setup(node, json);
+    setup(htmlElem, json);
   })('graph.json');
 }
 
 export const ThreeCanvas = () => {
   const [initialised, setInitialised] = useState(false);
   const threeDivRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node !== null && !initialised) {
-        initialiseScene(node)
+    (htmlElem: HTMLDivElement | null) => {
+      if (htmlElem !== null && !initialised) {
+        initialiseScene(htmlElem)
         setInitialised(true)
       }
     },
