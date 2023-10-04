@@ -27,7 +27,6 @@ const initialiseScene = (document: Document, htmlElem: HTMLDivElement) => {
   const setup = (htmlElem: HTMLDivElement, json: any) => {
 
     const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, window.innerWidth/window.innerHeight, 0.1, 4000);
-    console.dir(camera);
 
     const onWindowResize = () => {
       const newAspect = window.innerWidth / window.innerHeight;
@@ -83,10 +82,10 @@ const initialiseScene = (document: Document, htmlElem: HTMLDivElement) => {
       const text = document.createElement('div');
       text.className = 'label';
       text.style.color = `rgba(${100+Math.random()*155}, ${100+Math.random()*155}, ${100+Math.random()*155}, 0.5)`;
+      text.style.fontSize = '10px';
       text.textContent = json.nodes[i].label;
       const label = new CSS2DObject(text);
       label.position.set(x, y, z);
-      label.renderOrder = 1;
       labelGroup.add(label);
     }
 
@@ -167,7 +166,15 @@ const initialiseScene = (document: Document, htmlElem: HTMLDivElement) => {
 
       labelRenderer.render(scene, camera);
       renderer.render(scene, camera);
-      console.log(`animate ${camera.zoom} ${camera.toJSON()}`);
+      const zero = nodeGeometry.boundingSphere!.center;
+      const dist = zero.distanceTo(camera.position);
+      const size = `${2000 / dist}px`;
+      labelGroup.children.forEach((t: any) => {
+        // Doing per-label sizing is probably too slow.
+        // const dist = t.position.distanceTo(camera.position);
+        // const size = `${2000 / dist}px`;
+        t.element.style.fontSize = size;
+      });
     }
     animate();
 
