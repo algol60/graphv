@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
+// import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js'
 import { F32Array, NodeIndex, EdgeIndex } from './util';
 
 const FIELD_OF_VIEW = 45.0;
 
-const initialiseScene = (htmlElem: HTMLDivElement) => {
+const initialiseScene = (document: Document, htmlElem: HTMLDivElement) => {
 
   const COLOR_MAP = new Map<string, number[]>([
     ['A', [1,0.25,0.25]],
@@ -26,12 +27,15 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
   const setup = (htmlElem: HTMLDivElement, json: any) => {
 
     const camera = new THREE.PerspectiveCamera(FIELD_OF_VIEW, window.innerWidth/window.innerHeight, 0.1, 4000);
+    console.dir(camera);
 
     const onWindowResize = () => {
       const newAspect = window.innerWidth / window.innerHeight;
       camera.aspect = newAspect;
       camera.updateProjectionMatrix();
+
       renderer.setSize(window.innerWidth, window.innerHeight);
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
     };
 
     const pointer = new THREE.Vector2();
@@ -55,6 +59,7 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
     const nodeGeometry = new THREE.BufferGeometry()
     const nodePositions = new F32Array(json.nodes.length*3);
     const nodeColors = new F32Array(json.nodes.length*3);
+    const labelGroup = new THREE.Group();
 
     // Map the node ids to a position and a buffer index.
     //
@@ -74,6 +79,15 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
       const ec: string = json.nodes[i].entityClass;
       const color: number[] = COLOR_MAP.has(ec) ? COLOR_MAP.get(ec)! : [1,1,1];
       nodeColors.push(...color);
+
+      const text = document.createElement('div');
+      text.className = 'label';
+      text.style.color = `rgba(${100+Math.random()*155}, ${100+Math.random()*155}, ${100+Math.random()*155}, 0.5)`;
+      text.textContent = json.nodes[i].label;
+      const label = new CSS2DObject(text);
+      label.position.set(x, y, z);
+      label.renderOrder = 1;
+      labelGroup.add(label);
     }
 
     nodeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions.array, 3));
@@ -97,6 +111,7 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
     pn.add(lineSegments);
     // scene.add(lineSegments);
     scene.add(pn);
+    scene.add(labelGroup);
 
     const sprite = new THREE.TextureLoader().load('circle.png');
     sprite.colorSpace = THREE.SRGBColorSpace;
@@ -120,7 +135,14 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     htmlElem.appendChild(renderer.domElement);
 
-    // Zoom the camera to fit the scene.
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '20px';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    htmlElem.appendChild(labelRenderer.domElement);
+
+    // Zoom the camera to fit the scene.orbit
     // Move the orbital control to match.
     //
     nodeGeometry.computeBoundingSphere();
@@ -131,6 +153,7 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
     controls.update();
 
     let intersected: THREE.Intersection<THREE.Object3D<THREE.Object3DEventMap>> | undefined = undefined;
+
     const animate = () => {
       requestAnimationFrame(animate)
 
@@ -142,7 +165,9 @@ const initialiseScene = (htmlElem: HTMLDivElement) => {
       // required if controls.enableDamping or controls.autoRotate are set to true
       // controls.update();
 
+      labelRenderer.render(scene, camera);
       renderer.render(scene, camera);
+      console.log(`animate ${camera.zoom} ${camera.toJSON()}`);
     }
     animate();
 
@@ -163,7 +188,7 @@ export const ThreeCanvas = () => {
   const threeDivRef = useCallback(
     (htmlElem: HTMLDivElement | null) => {
       if (htmlElem !== null && !initialised) {
-        initialiseScene(htmlElem)
+        initialiseScene(document, htmlElem)
         setInitialised(true)
       }
     },
